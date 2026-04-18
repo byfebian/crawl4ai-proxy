@@ -1,5 +1,5 @@
-# crawl4ai OpenWebUI proxy
-This simple proxy server can be run in a docker container to let an [OpenWebUI](https://github.com/open-webui/open-webui) instance interact with a [crawl4ai](https://github.com/unclecode/crawl4ai) instance.
+# crawl4ai OpenWebUI proxy (compatible with latest Crawl4AI 0.8.x)
+This simple proxy server can be run in a docker container to let an [OpenWebUI](https://github.com/open-webui/open-webui) instance interact with a [crawl4ai](https://github.com/unclecode/crawl4ai) instance. (compatible with the latest Crawl4AI 0.8.x)
 This makes the OpenWebUI's web search feature a lot faster and way more usable without paying for an API service. 🎉
 
 ## Usage
