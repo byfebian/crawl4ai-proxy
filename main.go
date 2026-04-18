@@ -26,13 +26,10 @@ var (
 
     // --- Feature flags (set to "false" env var to disable) ---
 
-    // REMOVE_CONSENT_POPUPS: Auto-dismiss cookie/consent banners from 40+ CMP
-    // platforms (OneTrust, Cookiebot, Didomi, etc.). Huge quality win — prevents
-    // banner text from polluting extracted content.
+    // REMOVE_CONSENT_POPUPS: Auto-dismiss cookie/consent banners
     REMOVE_CONSENT_POPUPS bool = true
 
     // FLATTEN_SHADOW_DOM: Extract content hidden inside Shadow DOM components.
-    // Modern sites (especially those using Web Components) hide content here.
     FLATTEN_SHADOW_DOM bool = true
 
     // AVOID_ADS: Block ad trackers at the network level for faster, cleaner crawls.
@@ -238,7 +235,7 @@ func CrawlEndpoint(response http.ResponseWriter, request *http.Request) {
     // -------------------------------------------------------------------------
     // Build the enriched Crawl4AI request payload
     // Instead of just sending {"urls": [...]}, we now send a full configuration
-    // that unlocks Crawl4AI 0.8.5's powerful features.
+    // that unlocks Crawl4AI 0.8.5's features.
     // -------------------------------------------------------------------------
     crawlPayload := map[string]interface{}{
         "urls": requestData.Urls,
@@ -273,13 +270,11 @@ func CrawlEndpoint(response http.ResponseWriter, request *http.Request) {
         "crawler_config": map[string]interface{}{
             "type": "CrawlerRunConfig",
             "params": map[string]interface{}{
-                // remove_consent_popups: Auto-dismiss cookie/consent banners from
-                // 40+ CMP platforms (OneTrust, Cookiebot, Didomi, etc.).
-                // Prevents banner text from polluting extracted content.
+                // remove_consent_popups: Auto-dismiss cookie/consent banners
                 "remove_consent_popups": REMOVE_CONSENT_POPUPS,
 
                 // flatten_shadow_dom: Extract content hidden inside Shadow DOM
-                // components. Modern sites (Web Components) hide content here.
+                // components.
                 "flatten_shadow_dom": FLATTEN_SHADOW_DOM,
 
                 // markdown_generator: Configures how HTML → Markdown conversion works.
