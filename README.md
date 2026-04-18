@@ -1,4 +1,3 @@
-```markdown
 # Crawl4AI OpenWebUI Proxy (for Crawl4AI 0.8.x)
 
 A lightweight proxy server that lets an [OpenWebUI](https://github.com/open-webui/open-webui) instance interact with a [Crawl4AI](https://github.com/unclecode/crawl4ai) instance, making OpenWebUI's web search feature faster and more usable without paying for an API service. 🎉
@@ -180,4 +179,3 @@ curl http://crawl4ai-proxy:8000/health
 - Original proxy by [lennyerik](https://github.com/lennyerik/crawl4ai-proxy/) (Crawl4AI v0.6.x)
 - [Crawl4AI](https://github.com/unclecode/crawl4ai) by [unclecode](https://github.com/unclecode)
 - [OpenWebUI](https://github.com/open-webui/open-webui)
-```
