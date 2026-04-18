@@ -4,7 +4,7 @@ This makes the OpenWebUI's web search feature a lot faster and way more usable w
 
 ## Usage
 
-> **Note:** This fork is updated for compatibility with teh latest Crawl4AI v0.8.x.
+> **Note:** This fork is updated for compatibility with the latest Crawl4AI v0.8.x.
 > The [original repo](https://github.com/lennyerik/crawl4ai-proxy/) was built for Crawl4AI v0.6.x.
 
 Given a `docker-compose.yml` file that looks something like this:
