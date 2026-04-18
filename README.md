@@ -4,8 +4,8 @@ This makes the OpenWebUI's web search feature a lot faster and way more usable w
 
 ## Usage
 
-> **Note:** This fork is updated for compatibility with Crawl4AI v0.8.5+.
-> The original repo was built for Crawl4AI v0.6.0 and is incompatible with v0.8.x.
+> **Note:** This fork is updated for compatibility with Crawl4AI v0.8.x.
+> The [original repo](https://github.com/lennyerik/crawl4ai-proxy/) was built for Crawl4AI v0.6.x and is incompatible with Crawl4AI v0.8.x.
 
 Given a `docker-compose.yml` file that looks something like this:
 
@@ -38,3 +38,10 @@ services:
             - openwebui
 networks:
     - openwebui
+```
+
+Run docker compose up -d, visit localhost:8080 in a browser, navigate to Admin Panel → Web Search and under the "Loader" section, set:
+
+    Web Loader Engine: external
+    External Web Loader URL: http://crawl4ai-proxy:8000/crawl
+    External Web Loader API Key: * (doesn't matter, but is a required field)
