@@ -2,19 +2,35 @@
 
 A lightweight proxy server that lets an [OpenWebUI](https://github.com/open-webui/open-webui) instance interact with a [Crawl4AI](https://github.com/unclecode/crawl4ai) instance, making OpenWebUI's web search feature faster and more usable without paying for an API service. 🎉
 
-Forked from [lennyerik/crawl4ai-proxy](https://github.com/lennyerik/crawl4ai-proxy/) and updated for compatibility with the latest Crawl4AI **0.8.x** version
+Forked from [lennyerik/crawl4ai-proxy](https://github.com/lennyerik/crawl4ai-proxy/) and updated for compatibility with Crawl4AI **0.8.x** (tested against **0.8.6**).
 
 ## What This Proxy Does
 
 OpenWebUI's External Web Loader sends a simple `{"urls": [...]}` request. Crawl4AI's Docker API expects a richer request format and returns a complex response. This proxy sits between them and:
 
 1. Receives `{"urls": [...]}` from OpenWebUI
-2. Enriches the request with Crawl4AI 0.8.5 features (consent popup removal, shadow DOM flattening, ad blocking, content pruning)
+2. Enriches the request with Crawl4AI 0.8.6-ready features (consent popup removal, shadow DOM flattening, ad/CSS blocking, content pruning, retries, proxy pass-through)
 3. Forwards the enriched request to Crawl4AI
 4. Converts Crawl4AI's response back into OpenWebUI's expected format
 5. Prefers `fit_markdown` (pruned, high-quality content) over `raw_markdown`
 
 ## Features
+
+### v0.0.3 — Hardening + Crawl4AI 0.8.6 Alignment
+
+| Feature | Environment Variable | Default | Description |
+|---------|---------------------|---------|-------------|
+| **Downstream Auth Token** | `CRAWL4AI_AUTH_TOKEN` | `""` | Optional token for secured Crawl4AI instances |
+| **Downstream Auth Scheme** | `CRAWL4AI_AUTH_SCHEME` | `Bearer` | Prefix used when building auth header value |
+| **Downstream Auth Header** | `CRAWL4AI_AUTH_HEADER` | `Authorization` | Header name used for downstream auth |
+| **Overlay Removal** | `REMOVE_OVERLAY_ELEMENTS` | `true` | Enables Crawl4AI overlay removal |
+| **CSS Blocking** | `AVOID_CSS` | `false` | Blocks CSS resources for lighter/faster crawls |
+| **Anti-Bot Retries** | `MAX_RETRIES` | `0` | Retry count for Crawl4AI anti-bot flow |
+| **Proxy Pass-through** | `PROXY_CONFIG_JSON` | `""` | Raw JSON passed to `crawler_config.proxy_config` |
+| **Batch Guard** | `MAX_URLS_PER_REQUEST` | `100` | Reject oversized URL batches early |
+| **Body Size Guard** | `MAX_REQUEST_BODY_BYTES` | `1048576` | Reject overly large request bodies |
+| **Strict Body Limit Enforcement** | `MAX_REQUEST_BODY_BYTES` | `1048576` | Enforced with `http.MaxBytesReader`; oversized payloads now return `413` and cannot bypass limits via trailing bytes |
+| **HTTP Robustness** | — | — | Accepts `application/json; charset=utf-8`, avoids panics, closes downstream body, returns clearer gateway errors |
 
 ### v0.0.2 — Crawl4AI 0.8.5 Feature Integration
 
@@ -44,19 +60,29 @@ OpenWebUI's External Web Loader sends a simple `{"urls": [...]}` request. Crawl4
 ```yaml
 services:
     crawl4ai-proxy:
-        image: ghcr.io/byfebian/crawl4ai-proxy:0.0.2
+        image: ghcr.io/byfebian/crawl4ai-proxy:0.0.3
         environment:
             - LISTEN_PORT=8000
             - CRAWL4AI_ENDPOINT=http://crawl4ai:11235/crawl
             # Optional: uncomment to change defaults
             # - REMOVE_CONSENT_POPUPS=true
             # - FLATTEN_SHADOW_DOM=true
+            # - REMOVE_OVERLAY_ELEMENTS=true
             # - AVOID_ADS=true
+            # - AVOID_CSS=false
             # - MEMORY_SAVING_MODE=true
             # - MAX_PAGES_BEFORE_RECYCLE=100
             # - PRUNING_THRESHOLD=0.48
             # - INCLUDE_REFERENCES=true
+            # - MAX_RETRIES=0
+            # - PROXY_CONFIG_JSON=["direct","http://my-proxy:8080"]
+            # - MAX_URLS_PER_REQUEST=100
+            # - MAX_REQUEST_BODY_BYTES=1048576
             # - CRAWL_TIMEOUT_SECONDS=120
+            # Optional downstream auth:
+            # - CRAWL4AI_AUTH_TOKEN=your-jwt-or-token
+            # - CRAWL4AI_AUTH_SCHEME=Bearer
+            # - CRAWL4AI_AUTH_HEADER=Authorization
         networks:
             - openwebui
 
@@ -75,7 +101,7 @@ services:
             - openwebui
 
     crawl4ai:
-        image: unclecode/crawl4ai:0.8.5
+        image: unclecode/crawl4ai:0.8.6
         shm_size: 1g
         networks:
             - openwebui
@@ -121,11 +147,20 @@ environment:
     # Block ad trackers at the network level
     - AVOID_ADS=true
 
+    # Block CSS resources at the network level
+    - AVOID_CSS=false
+
+    # Remove sticky overlays/popups that block content
+    - REMOVE_OVERLAY_ELEMENTS=true
+
     # Prevent memory leaks in long-running sessions
     - MEMORY_SAVING_MODE=true
 
     # Append link references/citations to output
     - INCLUDE_REFERENCES=true
+
+    # Crawl4AI anti-bot retry count
+    - MAX_RETRIES=0
 ```
 
 ### Tuning Parameters
@@ -141,8 +176,34 @@ environment:
     # Auto-restart browser after N pages (prevents memory leaks)
     - MAX_PAGES_BEFORE_RECYCLE=100
 
+    # Reject requests with too many URLs
+    - MAX_URLS_PER_REQUEST=100
+
+    # Reject oversized request bodies (bytes)
+    - MAX_REQUEST_BODY_BYTES=1048576
+
     # How long to wait for Crawl4AI before giving up (seconds)
     - CRAWL_TIMEOUT_SECONDS=120
+```
+
+### Optional: Secured Crawl4AI (JWT/Bearer)
+
+If your Crawl4AI server requires authentication, configure proxy-to-Crawl4AI auth forwarding:
+
+```yaml
+environment:
+    - CRAWL4AI_AUTH_TOKEN=your-jwt-or-token
+    - CRAWL4AI_AUTH_SCHEME=Bearer
+    - CRAWL4AI_AUTH_HEADER=Authorization
+```
+
+### Optional: Advanced Proxy Rotation Pass-through
+
+For advanced proxy config accepted by Crawl4AI, pass raw JSON via:
+
+```yaml
+environment:
+    - PROXY_CONFIG_JSON=["direct","http://my-proxy:8080"]
 ```
 
 ## API Endpoints
@@ -171,6 +232,7 @@ curl http://crawl4ai-proxy:8000/health
 
 | Version | Date | Changes |
 |---------|------|---------|
+| v0.0.3 | Apr 2026 | Crawl4AI 0.8.6 alignment + proxy hardening: downstream auth forwarding, stricter request validation, strict `MAX_REQUEST_BODY_BYTES` enforcement with `413` on oversized bodies, content-type compatibility (`application/json; charset=utf-8`), safer upstream error handling, `avoid_css`, `remove_overlay_elements`, `max_retries`, `proxy_config` pass-through, larger test coverage, Docker/CI improvements |
 | v0.0.2 | Apr 2026 | Crawl4AI 0.8.5 feature integration: consent popup removal, shadow DOM flattening, ad blocking, PruningContentFilter, memory saving mode, browser recycling, request timeout, health check endpoint, references/citations in output, configurable environment variables |
 | v0.0.1 | Apr 2026 | Crawl4AI 0.8.x compatibility: updated response struct, fit_markdown support, metadata type fix |
 
