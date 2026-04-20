@@ -366,7 +366,7 @@ curl http://crawl4ai-proxy:8000/metrics?reset=true
 
 | Version | Date | Changes |
 |---------|------|---------|
-| v0.0.4 | Apr 2026 | Feature expansion + resilience: BM25/pruning/none content filters, CSS selector/target element extraction, JS execution/wait_for, content_source selection, stealth mode, user agent, deep crawl (BFS), 4 new endpoints (/md, /screenshot, /execute_js, /metrics), deep health check, separate connect/total timeouts, upstream retry with backoff, per-IP rate limiting, TTL response cache, request correlation IDs (X-Request-ID), structured JSON logging (slog), graceful shutdown, HTTP server timeouts, typed ProxyConfig, feature flags (iframes, only_text, robots_txt, text_mode, light_mode, capture_network/console, preserve_https), per-request overrides for all major settings, code refactored into multi-file layout |
+| v0.0.4 | Apr 2026 | Feature expansion, code refactored into multi-file layout, add crawl4ai_tools.py to integrate with OpenWebUI tools |
 | v0.0.3 | Apr 2026 | Crawl4AI 0.8.6 alignment + proxy hardening |
 | v0.0.2 | Apr 2026 | Crawl4AI 0.8.5 feature integration |
 | v0.0.1 | Apr 2026 | Crawl4AI 0.8.x compatibility |
