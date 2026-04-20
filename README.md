@@ -29,7 +29,7 @@ This proxy also ships with an **OpenWebUI Tool** (`crawl4ai_tools.py`) that adds
 
 ## Features
 
-### v0.0.4 - Feature Expansion + OpenWebUI Tools Integration
+### v0.0.4 - Feature Expansion + OpenWebUI Tools
 
 | Feature | Environment Variable | Default | Description |
 |---------|---------------------|---------|-------------|
