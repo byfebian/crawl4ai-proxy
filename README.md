@@ -10,7 +10,7 @@ OpenWebUI's External Web Loader sends a simple `{"urls": [...]}` request. Crawl4
 
 1. Receives `{"urls": [...]}` from OpenWebUI
 2. Enriches the request with Crawl4AI 0.8.x-ready features
-3. Forwards the enriched request to Crawl4AI
+3. Forwards the request to Crawl4AI
 4. Converts Crawl4AI's response back into OpenWebUI's expected format
 5. Prefers `fit_markdown` (pruned, high-quality content) over `raw_markdown`
 
@@ -29,7 +29,7 @@ This proxy also ships with an **OpenWebUI Tool** (`crawl4ai_tools.py`) that adds
 
 ## Features
 
-### v0.0.4 - Feature Expansion + Resilience
+### v0.0.4 - Feature Expansion + OpenWebUI Tools Integration
 
 | Feature | Environment Variable | Default | Description |
 |---------|---------------------|---------|-------------|
