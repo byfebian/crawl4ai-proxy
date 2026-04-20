@@ -2,7 +2,7 @@
 
 A lightweight proxy server that lets an [OpenWebUI](https://github.com/open-webui/open-webui) instance interact with a [Crawl4AI](https://github.com/unclecode/crawl4ai) instance, making OpenWebUI's web search feature faster and more usable without paying for an API service.
 
-Forked from [lennyerik/crawl4ai-proxy](https://github.com/lennyerik/crawl4ai-proxy/) and updated for compatibility with Crawl4AI **0.8.x** (tested against **0.8.6**).
+Forked from [lennyerik/crawl4ai-proxy](https://github.com/lennyerik/crawl4ai-proxy/) and updated for compatibility with Crawl4AI **0.8.x** (tested against **0.8.6**). See [`WIKI`](https://github.com/byfebian/crawl4ai-proxy/wiki) for full configuration reference and troubleshooting.
 
 ## What This Proxy Does
 
@@ -195,8 +195,6 @@ You'll get 5 controls in every chat:
 | **Max Pages** | Number | Any number | Max pages to crawl when Deep Research is ON (default 10) |
 | **Reading Mode** | Dropdown | Best / Focused / All | Best=pruning, Focused=bm25, All=no filter |
 | **Stealth Mode** | ON/OFF | ON / OFF | Bypass bot detection on protected sites |
-
-See [`docs.md`](docs.md) for full configuration reference and troubleshooting.
 
 ## Configuration
 
