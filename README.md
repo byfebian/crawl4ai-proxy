@@ -1,41 +1,118 @@
 # Crawl4AI OpenWebUI Proxy (for Crawl4AI 0.8.x)
 
-A lightweight proxy server that lets an [OpenWebUI](https://github.com/open-webui/open-webui) instance interact with a [Crawl4AI](https://github.com/unclecode/crawl4ai) instance, making OpenWebUI's web search feature faster and more usable without paying for an API service. 🎉
+A lightweight proxy server that lets an [OpenWebUI](https://github.com/open-webui/open-webui) instance interact with a [Crawl4AI](https://github.com/unclecode/crawl4ai) instance, making OpenWebUI's web search feature faster and more usable without paying for an API service.
 
-Forked from [lennyerik/crawl4ai-proxy](https://github.com/lennyerik/crawl4ai-proxy/) and updated for compatibility with the latest Crawl4AI **0.8.x** version
+Forked from [lennyerik/crawl4ai-proxy](https://github.com/lennyerik/crawl4ai-proxy/) and updated for compatibility with Crawl4AI **0.8.x** (tested against **0.8.6**).
 
 ## What This Proxy Does
 
 OpenWebUI's External Web Loader sends a simple `{"urls": [...]}` request. Crawl4AI's Docker API expects a richer request format and returns a complex response. This proxy sits between them and:
 
 1. Receives `{"urls": [...]}` from OpenWebUI
-2. Enriches the request with Crawl4AI 0.8.5 features (consent popup removal, shadow DOM flattening, ad blocking, content pruning)
+2. Enriches the request with Crawl4AI 0.8.x-ready features
 3. Forwards the enriched request to Crawl4AI
 4. Converts Crawl4AI's response back into OpenWebUI's expected format
 5. Prefers `fit_markdown` (pruned, high-quality content) over `raw_markdown`
 
+This proxy also ships with an **OpenWebUI Tool** (`crawl4ai_tools.py`) that adds user-friendly toggles for Deep Research, Reading Mode, and Stealth Mode directly in the chat UI.
+
+## Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/crawl` | POST | Main proxy endpoint - accepts `{"urls": [...]}` from OpenWebUI |
+| `/md` | POST | Markdown-only extraction - accepts `{"url": "...", "filter_type": "fit"\|"raw"\|"bm25", "bm25_query": "..."}` |
+| `/screenshot` | POST | Screenshot capture - accepts `{"url": "..."}` |
+| `/execute_js` | POST | Execute JavaScript - accepts `{"url": "...", "scripts": ["..."]}` |
+| `/health` | GET | Health check - returns `{"status": "healthy"}`; add `?deep=true` to check upstream |
+| `/metrics` | GET | Request metrics - returns JSON counters; add `?reset=true` to reset |
+
 ## Features
 
-### v0.0.2 — Crawl4AI 0.8.5 Feature Integration
+### v0.0.4 - Feature Expansion + Resilience
 
 | Feature | Environment Variable | Default | Description |
 |---------|---------------------|---------|-------------|
-| **Consent Popup Removal** | `REMOVE_CONSENT_POPUPS` | `true` | Auto-dismisses cookie/consent banners from 40+ CMP platforms (OneTrust, Cookiebot, Didomi, etc.) |
-| **Shadow DOM Flattening** | `FLATTEN_SHADOW_DOM` | `true` | Extracts content hidden inside Shadow DOM components (modern web apps) |
-| **Ad Blocking** | `AVOID_ADS` | `true` | Blocks ad trackers at the network level for faster, cleaner crawls |
-| **Memory Saving Mode** | `MEMORY_SAVING_MODE` | `true` | Aggressive cache/V8 heap flags to prevent memory leaks during long sessions |
-| **Browser Recycling** | `MAX_PAGES_BEFORE_RECYCLE` | `100` | Auto-restarts the browser after N pages to prevent memory leaks |
-| **Content Pruning** | `PRUNING_THRESHOLD` | `0.48` | Removes boilerplate (nav bars, footers, sidebars) using PruningContentFilter. Lower = more aggressive, higher = keep more content |
-| **References** | `INCLUDE_REFERENCES` | `true` | Appends link references/citations to markdown output for better source attribution |
-| **Request Timeout** | `CRAWL_TIMEOUT_SECONDS` | `120` | Prevents hung requests from blocking forever |
-| **Health Check** | — | — | `/health` endpoint for monitoring |
+| **Content Filter Type** | `CONTENT_FILTER_TYPE` | `pruning` | Filter type: `pruning`, `bm25`, or `none` |
+| **BM25 User Query** | `BM25_USER_QUERY` | `""` | Default query for BM25 content filter |
+| **Min Word Threshold** | `MIN_WORD_THRESHOLD` | `10` | Minimum word threshold for pruning filter |
+| **CSS Selector** | `CSS_SELECTOR` | `""` | Target specific elements for extraction |
+| **Excluded Tags** | `EXCLUDED_TAGS` | `""` | Comma-separated HTML tags to exclude |
+| **Target Elements** | `TARGET_ELEMENTS` | `""` | Comma-separated CSS selectors for targeted extraction |
+| **JavaScript Code** | `JS_CODE` | `""` | JavaScript to execute on page (comma-separated) |
+| **Wait For** | `WAIT_FOR` | `""` | CSS/XPath selector or JS to wait for before extraction |
+| **Scan Full Page** | `SCAN_FULL_PAGE` | `false` | Scroll through entire page before extraction |
+| **Scroll Delay** | `SCROLL_DELAY` | `0.0` | Delay between scrolls (seconds) |
+| **Content Source** | `CONTENT_SOURCE` | `fit_html` | Source for markdown: `fit_html`, `raw_html`, or `cleaned_html` |
+| **Stealth Mode** | `ENABLE_STEALTH` | `false` | Apply playwright-stealth anti-detection |
+| **User Agent** | `USER_AGENT` | `""` | Custom browser User-Agent string |
+| **Deep Crawl** | `DEEP_CRAWL` | `false` | Enable BFS deep crawl strategy |
+| **Deep Crawl Max Depth** | `DEEP_CRAWL_MAX_DEPTH` | `1` | Maximum depth for deep crawl |
+| **Deep Crawl Max Pages** | `DEEP_CRAWL_MAX_PAGES` | `10` | Maximum pages for deep crawl |
+| **Connect Timeout** | `CRAWL_CONNECT_TIMEOUT_SECONDS` | `10` | Connection timeout to upstream |
+| **Total Timeout** | `CRAWL_TOTAL_TIMEOUT_SECONDS` | `120` | Total request timeout to upstream |
+| **Upstream Retries** | `UPSTREAM_RETRIES` | `0` | Retry count on 5xx upstream errors |
+| **Upstream Retry Delay** | `UPSTREAM_RETRY_DELAY_MS` | `500` | Initial retry delay in ms (exponential backoff) |
+| **Cache Enabled** | `CACHE_ENABLED` | `true` | Enable response caching |
+| **Cache TTL** | `CACHE_TTL_SECONDS` | `300` | Cache entry time-to-live in seconds |
+| **Cache Max Entries** | `CACHE_MAX_ENTRIES` | `500` | Maximum number of cached responses |
+| **Rate Limit RPS** | `RATE_LIMIT_RPS` | `10` | Requests per second per client IP |
+| **Rate Limit Burst** | `RATE_LIMIT_BURST` | `20` | Burst capacity per client IP |
+| **Server Read Timeout** | `SERVER_READ_TIMEOUT_SECONDS` | `30` | HTTP server read timeout |
+| **Server Write Timeout** | `SERVER_WRITE_TIMEOUT_SECONDS` | `180` | HTTP server write timeout |
+| **Server Idle Timeout** | `SERVER_IDLE_TIMEOUT_SECONDS` | `120` | HTTP server idle timeout |
+| **Log Format** | `LOG_FORMAT` | `text` | Log format: `text` or `json` |
+| **Request ID** | (automatic) | - | `X-Request-ID` auto-generated and forwarded upstream |
+| **Feature Flags** | `PROCESS_IFRAMES`, `ONLY_TEXT`, `CHECK_ROBOTS_TXT`, `VERIFY_SSL`, `TEXT_MODE`, `LIGHT_MODE`, `CAPTURE_NETWORK_REQUESTS`, `CAPTURE_CONSOLE_MESSAGES`, `PRESERVE_HTTPS_FOR_INTERNAL_LINKS` | see defaults | Various crawl4ai feature toggles |
 
-### v0.0.1 — Crawl4AI 0.8.x Compatibility
+### v0.0.3 - Hardening + Crawl4AI 0.8.6 Alignment
 
-- Updated response struct for Crawl4AI 0.8.x `MarkdownGenerationResult` format
-- Changed metadata type from `map[string]string` to `map[string]interface{}`
-- Added support for `fit_markdown` (higher quality filtered content)
-- Handle both single result and results array responses
+| Feature | Environment Variable | Default | Description |
+|---------|---------------------|---------|-------------|
+| **Downstream Auth Token** | `CRAWL4AI_AUTH_TOKEN` | `""` | Optional token for secured Crawl4AI instances |
+| **Downstream Auth Scheme** | `CRAWL4AI_AUTH_SCHEME` | `Bearer` | Prefix used when building auth header value |
+| **Downstream Auth Header** | `CRAWL4AI_AUTH_HEADER` | `Authorization` | Header name used for downstream auth |
+| **Overlay Removal** | `REMOVE_OVERLAY_ELEMENTS` | `true` | Enables Crawl4AI overlay removal |
+| **CSS Blocking** | `AVOID_CSS` | `false` | Blocks CSS resources for lighter/faster crawls |
+| **Anti-Bot Retries** | `MAX_RETRIES` | `0` | Retry count for Crawl4AI anti-bot flow |
+| **Proxy Pass-through** | `PROXY_CONFIG_JSON` | `""` | Raw JSON passed to `crawler_config.proxy_config` |
+| **Batch Guard** | `MAX_URLS_PER_REQUEST` | `100` | Reject oversized URL batches early |
+| **Body Size Guard** | `MAX_REQUEST_BODY_BYTES` | `1048576` | Reject overly large request bodies (1 MiB) |
+
+### v0.0.2 - Crawl4AI 0.8.5 Feature Integration
+
+| Feature | Environment Variable | Default | Description |
+|---------|---------------------|---------|-------------|
+| **Consent Popup Removal** | `REMOVE_CONSENT_POPUPS` | `true` | Auto-dismisses cookie/consent banners |
+| **Shadow DOM Flattening** | `FLATTEN_SHADOW_DOM` | `true` | Extracts content hidden inside Shadow DOM |
+| **Ad Blocking** | `AVOID_ADS` | `true` | Blocks ad trackers at the network level |
+| **Memory Saving Mode** | `MEMORY_SAVING_MODE` | `true` | Aggressive cache/V8 heap flags |
+| **Browser Recycling** | `MAX_PAGES_BEFORE_RECYCLE` | `100` | Auto-restart browser after N pages |
+| **Content Pruning** | `PRUNING_THRESHOLD` | `0.48` | Boilerplate removal threshold |
+| **References** | `INCLUDE_REFERENCES` | `true` | Append link references to markdown output |
+
+## Per-Request Overrides
+
+The `/crawl` endpoint accepts optional fields that override environment variable defaults:
+
+```json
+{
+  "urls": ["https://example.com"],
+  "content_filter_type": "bm25",
+  "bm25_query": "climate change",
+  "css_selector": "article",
+  "excluded_tags": ["nav", "footer"],
+  "target_elements": [".main-content"],
+  "js_code": ["document.title"],
+  "wait_for": ".content",
+  "content_source": "raw_html",
+  "enable_stealth": true,
+  "user_agent": "MyBot/1.0",
+  "deep_crawl": true,
+  "deep_crawl_max_depth": 3,
+  "deep_crawl_max_pages": 50
+}
+```
 
 ## Quick Start
 
@@ -44,19 +121,16 @@ OpenWebUI's External Web Loader sends a simple `{"urls": [...]}` request. Crawl4
 ```yaml
 services:
     crawl4ai-proxy:
-        image: ghcr.io/byfebian/crawl4ai-proxy:0.0.2
+        image: ghcr.io/byfebian/crawl4ai-proxy:0.0.4
         environment:
             - LISTEN_PORT=8000
             - CRAWL4AI_ENDPOINT=http://crawl4ai:11235/crawl
-            # Optional: uncomment to change defaults
-            # - REMOVE_CONSENT_POPUPS=true
-            # - FLATTEN_SHADOW_DOM=true
-            # - AVOID_ADS=true
-            # - MEMORY_SAVING_MODE=true
-            # - MAX_PAGES_BEFORE_RECYCLE=100
-            # - PRUNING_THRESHOLD=0.48
-            # - INCLUDE_REFERENCES=true
-            # - CRAWL_TIMEOUT_SECONDS=120
+            - CONTENT_FILTER_TYPE=pruning
+            - INCLUDE_REFERENCES=true
+            - CACHE_ENABLED=true
+            - CACHE_TTL_SECONDS=300
+            - RATE_LIMIT_RPS=10
+            - LOG_FORMAT=json
         networks:
             - openwebui
 
@@ -75,7 +149,7 @@ services:
             - openwebui
 
     crawl4ai:
-        image: unclecode/crawl4ai:0.8.5
+        image: unclecode/crawl4ai:0.8.6
         shm_size: 1g
         networks:
             - openwebui
@@ -94,7 +168,7 @@ docker compose up -d
 
 ### 3. Configure OpenWebUI
 
-Visit `localhost:8080` in a browser, navigate to **Admin Panel → Web Search** and under the **Loader** section, set:
+Visit `localhost:8080` in a browser, navigate to **Admin Panel -> Web Search** and under the **Loader** section, set:
 
 | Setting | Value |
 |---------|-------|
@@ -102,57 +176,132 @@ Visit `localhost:8080` in a browser, navigate to **Admin Panel → Web Search** 
 | External Web Loader URL | `http://crawl4ai-proxy:8000/crawl` |
 | External Web Loader API Key | `*` (doesn't matter, but is a required field) |
 
+### 4. (Optional) Add Crawl4AI Tools for UI Toggles
+
+For Deep Research, Reading Mode, and Stealth Mode toggles in the chat UI:
+
+1. Go to **Workspace → Tools → + Add**
+2. Switch to the **Code** editor tab
+3. Copy the contents of [`crawl4ai_tools.py`](crawl4ai_tools.py) and paste it in
+4. Click **Save**
+5. Enable the tool globally using the toggle in Admin Panel → Workspace → Tools
+
+You'll get 5 controls in every chat:
+
+| Toggle | Type | Options | What it does |
+|--------|------|---------|-------------|
+| **Deep Research** | ON/OFF | ON / OFF | Crawl linked pages for comprehensive coverage |
+| **Research Depth** | Dropdown | Low / Medium / High | Link-follow depth. Low=1, Medium=3, High=5 levels |
+| **Max Pages** | Number | Any number | Max pages to crawl when Deep Research is ON (default 10) |
+| **Reading Mode** | Dropdown | Best / Focused / All | Best=pruning, Focused=bm25, All=no filter |
+| **Stealth Mode** | ON/OFF | ON / OFF | Bypass bot detection on protected sites |
+
+See [`docs.md`](docs.md) for full configuration reference and troubleshooting.
+
 ## Configuration
 
-All features are configurable via environment variables. Defaults are optimized for OpenWebUI use — most users don't need to change anything.
+All features are configurable via environment variables. Defaults are optimized for OpenWebUI use.
 
-### Feature Flags
-
-Set to `true` to enable, `false` to disable:
+### Crawl Features
 
 ```yaml
 environment:
-    # Auto-dismiss cookie/consent banners (OneTrust, Cookiebot, Didomi, etc.)
+    - CONTENT_FILTER_TYPE=pruning
+    - BM25_USER_QUERY=
+    - MIN_WORD_THRESHOLD=10
+    - CSS_SELECTOR=
+    - EXCLUDED_TAGS=
+    - TARGET_ELEMENTS=
+    - JS_CODE=
+    - WAIT_FOR=
+    - SCAN_FULL_PAGE=false
+    - SCROLL_DELAY=0.0
+    - CONTENT_SOURCE=fit_html
+    - ENABLE_STEALTH=false
+    - USER_AGENT=
+    - DEEP_CRAWL=false
+    - DEEP_CRAWL_MAX_DEPTH=1
+    - DEEP_CRAWL_MAX_PAGES=10
+```
+
+### Feature Flags
+
+```yaml
+environment:
     - REMOVE_CONSENT_POPUPS=true
-
-    # Extract content from Shadow DOM components
     - FLATTEN_SHADOW_DOM=true
-
-    # Block ad trackers at the network level
+    - REMOVE_OVERLAY_ELEMENTS=true
     - AVOID_ADS=true
-
-    # Prevent memory leaks in long-running sessions
+    - AVOID_CSS=false
     - MEMORY_SAVING_MODE=true
+    - MAX_PAGES_BEFORE_RECYCLE=100
+    - PROCESS_IFRAMES=false
+    - ONLY_TEXT=false
+    - CHECK_ROBOTS_TXT=false
+    - VERIFY_SSL=true
+    - TEXT_MODE=false
+    - LIGHT_MODE=false
+    - CAPTURE_NETWORK_REQUESTS=false
+    - CAPTURE_CONSOLE_MESSAGES=false
+    - PRESERVE_HTTPS_FOR_INTERNAL_LINKS=false
+```
 
-    # Append link references/citations to output
-    - INCLUDE_REFERENCES=true
+### Resilience & Performance
+
+```yaml
+environment:
+    - CRAWL_CONNECT_TIMEOUT_SECONDS=10
+    - CRAWL_TOTAL_TIMEOUT_SECONDS=120
+    - UPSTREAM_RETRIES=0
+    - UPSTREAM_RETRY_DELAY_MS=500
+    - CACHE_ENABLED=true
+    - CACHE_TTL_SECONDS=300
+    - CACHE_MAX_ENTRIES=500
+    - RATE_LIMIT_RPS=10
+    - RATE_LIMIT_BURST=20
+    - SERVER_READ_TIMEOUT_SECONDS=30
+    - SERVER_WRITE_TIMEOUT_SECONDS=180
+    - SERVER_IDLE_TIMEOUT_SECONDS=120
 ```
 
 ### Tuning Parameters
 
 ```yaml
 environment:
-    # How aggressively to remove boilerplate.
-    # 0.3 = very aggressive (may remove too much)
-    # 0.48 = balanced (default)
-    # 0.7 = keep most content
     - PRUNING_THRESHOLD=0.48
-
-    # Auto-restart browser after N pages (prevents memory leaks)
-    - MAX_PAGES_BEFORE_RECYCLE=100
-
-    # How long to wait for Crawl4AI before giving up (seconds)
+    - MAX_URLS_PER_REQUEST=100
+    - MAX_REQUEST_BODY_BYTES=1048576
     - CRAWL_TIMEOUT_SECONDS=120
 ```
 
-## API Endpoints
+### Optional: Secured Crawl4AI (JWT/Bearer)
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/crawl` | POST | Main proxy endpoint — accepts `{"urls": [...]}` from OpenWebUI |
-| `/health` | GET | Health check — returns `{"status":"healthy"}` |
+```yaml
+environment:
+    - CRAWL4AI_AUTH_TOKEN=your-jwt-or-token
+    - CRAWL4AI_AUTH_SCHEME=Bearer
+    - CRAWL4AI_AUTH_HEADER=Authorization
+```
 
-### Example: Crawl a URL
+### Optional: Advanced Proxy Rotation
+
+```yaml
+environment:
+    - PROXY_CONFIG_JSON=["direct","http://my-proxy:8080"]
+```
+
+### Optional: Logging
+
+```yaml
+environment:
+    - LOG_FORMAT=json
+```
+
+Set to `json` for structured JSON logs (better for container environments), `text` for human-readable logs.
+
+## API Examples
+
+### Crawl URLs
 
 ```bash
 curl -X POST http://crawl4ai-proxy:8000/crawl \
@@ -160,19 +309,67 @@ curl -X POST http://crawl4ai-proxy:8000/crawl \
   -d '{"urls":["https://example.com"]}'
 ```
 
-### Example: Health Check
+### Crawl with BM25 query
+
+```bash
+curl -X POST http://crawl4ai-proxy:8000/crawl \
+  -H "Content-Type: application/json" \
+  -d '{"urls":["https://example.com"],"content_filter_type":"bm25","bm25_query":"artificial intelligence"}'
+```
+
+### Get Markdown Only
+
+```bash
+curl -X POST http://crawl4ai-proxy:8000/md \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com","filter_type":"bm25","bm25_query":"climate change"}'
+```
+
+### Take Screenshot
+
+```bash
+curl -X POST http://crawl4ai-proxy:8000/screenshot \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com"}'
+```
+
+### Execute JavaScript
+
+```bash
+curl -X POST http://crawl4ai-proxy:8000/execute_js \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com","scripts":["document.title"]}'
+```
+
+### Health Check
 
 ```bash
 curl http://crawl4ai-proxy:8000/health
 # {"status":"healthy"}
+
+# Deep health check (tests upstream connectivity)
+curl http://crawl4ai-proxy:8000/health?deep=true
+# {"status":"healthy","upstream":"reachable"}
+```
+
+### Metrics
+
+```bash
+curl http://crawl4ai-proxy:8000/metrics
+# {"total_requests":42,"total_errors":1,...}
+
+# Reset counters after reading
+curl http://crawl4ai-proxy:8000/metrics?reset=true
 ```
 
 ## Version History
 
 | Version | Date | Changes |
 |---------|------|---------|
-| v0.0.2 | Apr 2026 | Crawl4AI 0.8.5 feature integration: consent popup removal, shadow DOM flattening, ad blocking, PruningContentFilter, memory saving mode, browser recycling, request timeout, health check endpoint, references/citations in output, configurable environment variables |
-| v0.0.1 | Apr 2026 | Crawl4AI 0.8.x compatibility: updated response struct, fit_markdown support, metadata type fix |
+| v0.0.4 | Apr 2026 | Feature expansion + resilience: BM25/pruning/none content filters, CSS selector/target element extraction, JS execution/wait_for, content_source selection, stealth mode, user agent, deep crawl (BFS), 4 new endpoints (/md, /screenshot, /execute_js, /metrics), deep health check, separate connect/total timeouts, upstream retry with backoff, per-IP rate limiting, TTL response cache, request correlation IDs (X-Request-ID), structured JSON logging (slog), graceful shutdown, HTTP server timeouts, typed ProxyConfig, feature flags (iframes, only_text, robots_txt, text_mode, light_mode, capture_network/console, preserve_https), per-request overrides for all major settings, code refactored into multi-file layout |
+| v0.0.3 | Apr 2026 | Crawl4AI 0.8.6 alignment + proxy hardening |
+| v0.0.2 | Apr 2026 | Crawl4AI 0.8.5 feature integration |
+| v0.0.1 | Apr 2026 | Crawl4AI 0.8.x compatibility |
 
 ## Credits
 

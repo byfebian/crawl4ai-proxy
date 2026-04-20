@@ -1,0 +1,29 @@
+services:
+  crawl4ai:
+    image: unclecode/crawl4ai:0.8.6
+    shm_size: 1g
+    ports:
+      - "11235:11235"
+    environment:
+      - CRAWL4AI_API_TOKEN=
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11235/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  crawl4ai-proxy:
+    image: crawl4ai-proxy:v0.0.4
+    ports:
+      - "8000:8000"
+    environment:
+      - LISTEN_IP=0.0.0.0
+      - LISTEN_PORT=8000
+      - CRAWL4AI_ENDPOINT=http://crawl4ai:11235/crawl
+      - CRAWL_TOTAL_TIMEOUT_SECONDS=180
+      - LOG_FORMAT=text
+      - CACHE_ENABLED=false
+    depends_on:
+      crawl4ai:
+        condition: service_healthy
