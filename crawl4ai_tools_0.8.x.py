@@ -1,9 +1,9 @@
 """
-title: Deep Research
-author: byfebian
-version: 0.0.1
-license: MIT
-description: Crawl4AI Tools — OpenWebUI Integration
+Crawl4AI Tools — OpenWebUI 0.8.x Integration (LEGACY)
+======================================================
+
+NOTE: This file is for OpenWebUI 0.8.x which uses synchronous tools.
+For OpenWebUI 0.9.x+, use crawl4ai_tools.py instead.
 
 ======================================
 
@@ -54,9 +54,10 @@ from typing import Optional
 
 try:
     import httpx
-
     _USE_HTTPX = True
 except ImportError:
+    import urllib.request
+    import urllib.error
     _USE_HTTPX = False
 
 from pydantic import BaseModel, Field
@@ -90,7 +91,7 @@ class Tools:
     def __init__(self):
         self.valves = self.Valves()
 
-    async def crawl_web(self, url: str, __event_emitter__: Optional[callable] = None) -> str:
+    def crawl_web(self, url: str, __event_emitter__: Optional[callable] = None) -> str:
         """
         Crawl a web page and extract its content. Use this tool when you need to
         read or summarize content from a URL. Supports Deep Research for
@@ -110,7 +111,7 @@ class Tools:
         payload = self._build_payload(url)
 
         try:
-            result = await self._call_proxy(payload)
+            result = self._call_proxy(payload)
         except Exception as e:
             return f"Error fetching {url}: {str(e)}"
 
@@ -163,25 +164,27 @@ class Tools:
 
         return payload
 
-    async def _call_proxy(self, payload: dict) -> Optional[str]:
+    def _call_proxy(self, payload: dict) -> Optional[str]:
         """
         Send the request to crawl4ai-proxy and return extracted content.
-        Uses httpx AsyncClient (required for async event loop compatibility).
+        Uses httpx if available, falls back to urllib (stdlib).
         """
-        if not _USE_HTTPX:
-            raise Exception(
-                "httpx is required for async HTTP in Open WebUI 0.9.0+. "
-                "Please install httpx: pip install httpx"
-            )
-
         proxy_url = self.PROXY_URL.rstrip("/")
         endpoint = f"{proxy_url}/crawl"
+        body = json.dumps(payload).encode("utf-8")
 
+        if _USE_HTTPX:
+            return self._call_proxy_httpx(endpoint, body, proxy_url)
+        else:
+            return self._call_proxy_urllib(endpoint, body, proxy_url)
+
+    def _call_proxy_httpx(self, endpoint, body, proxy_url):
+        """Call proxy using httpx."""
         try:
-            async with httpx.AsyncClient(timeout=300.0) as client:
-                response = await client.post(
+            with httpx.Client(timeout=300.0) as client:
+                response = client.post(
                     endpoint,
-                    json=payload,
+                    content=body,
                     headers={"Content-Type": "application/json"},
                 )
                 response.raise_for_status()
@@ -203,7 +206,38 @@ class Tools:
                 f"Cannot connect to crawl proxy at {proxy_url}. "
                 f"Make sure crawl4ai-proxy is running and the URL is correct."
             )
+        return self._parse_response(data)
 
+    def _call_proxy_urllib(self, endpoint, body, proxy_url):
+        """Call proxy using urllib (stdlib fallback)."""
+        req = urllib.request.Request(
+            endpoint,
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=300) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            detail = ""
+            try:
+                error_body = json.loads(e.read().decode("utf-8"))
+                detail = error_body.get("detail", error_body.get("error", ""))
+            except Exception:
+                try:
+                    detail = e.read()[:200].decode("utf-8", errors="replace")
+                except Exception:
+                    detail = str(e.code)
+            raise Exception(f"Crawl proxy returned HTTP {e.code}: {detail}")
+        except urllib.error.URLError as e:
+            raise Exception(
+                f"Cannot connect to crawl proxy at {proxy_url}. "
+                f"Make sure crawl4ai-proxy is running and the URL is correct. "
+                f"Error: {e.reason}"
+            )
+        except TimeoutError:
+            raise Exception("Request to crawl proxy timed out after 300 seconds")
         return self._parse_response(data)
 
     def _parse_response(self, data) -> Optional[str]:
