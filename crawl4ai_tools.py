@@ -3,7 +3,7 @@ title: Deep Research
 author: byfebian
 version: 0.0.1
 license: MIT
-description: Crawl4AI Tools — OpenWebUI Integration
+description: Crawl4AI Tools — OpenWebUI Integration (requires OpenWebUI 0.9.x+)
 
 ======================================
 

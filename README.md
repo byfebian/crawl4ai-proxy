@@ -89,7 +89,8 @@ Go to **Admin Panel → Web Search** and under **Loader** set:
 
 1. Go to **Workspace → Tools → + Add**
 2. Switch to the **Code** editor tab
-3. Copy [`crawl4ai_tools.py`](crawl4ai_tools.py) and paste it in
+3. Copy [`crawl4ai_tools.py`](crawl4ai_tools.py) and paste it in  
+   *(Requires OpenWebUI 0.9.x+; for OpenWebUI 0.8.x, use the legacy [`crawl4ai_tools_0.8.x.py`](crawl4ai_tools_0.8.x.py) instead)*
 4. Click **Save**, then enable the tool globally in **Admin Panel → Workspace → Tools**
 
 You'll get 5 controls in every chat:
