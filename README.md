@@ -2,7 +2,8 @@
 
 A lightweight proxy server that lets [OpenWebUI](https://github.com/open-webui/open-webui) interact with [Crawl4AI](https://github.com/unclecode/crawl4ai), making web search faster and more usable without paying for an API service.
 
-Forked from [lennyerik/crawl4ai-proxy](https://github.com/lennyerik/crawl4ai-proxy/) and updated for Crawl4AI **0.8.x** (tested against **0.8.6**). Compatible with Open WebUI **0.8.x** and **0.9.x**.
+Forked from [lennyerik/crawl4ai-proxy](https://github.com/lennyerik/crawl4ai-proxy/) and updated for Crawl4AI **0.8.x** (tested against **0.8.6**). 
+Compatible with Open WebUI **0.8.x** and **0.9.x**.
 
 **Full docs:** [`WIKI`](https://github.com/byfebian/crawl4ai-proxy/wiki) — configuration reference, API examples, profiles, troubleshooting, and changelog.
 
