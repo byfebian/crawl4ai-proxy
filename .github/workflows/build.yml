@@ -116,7 +116,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          # New releases are created as DRAFTS (added 2026-10-18 at the
+          # owner's request): the image is already public on GHCR at this
+          # point, but the Release page itself only goes public once its
+          # notes are written in the house format (Compatible with /
+          # Docker image / What's New) and the draft is published
+          # manually. Existence check uses `gh release list` because it
+          # also sees drafts; `gh release view` by tag misses them, which
+          # would make a re-run fail trying to create the release again.
+          existing="$(gh release list --limit 100 --json tagName --jq ".[] | select(.tagName == \"$GITHUB_REF_NAME\") | .tagName")"
+          if [ -z "$existing" ]; then
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --draft
+            echo "### Draft release $GITHUB_REF_NAME created" >> "$GITHUB_STEP_SUMMARY"
+            echo "Attach step done - the tarball is uploaded to the draft. Write the release notes in the house format, then publish the draft: https://github.com/${{ github.repository }}/releases" >> "$GITHUB_STEP_SUMMARY"
           fi
           gh release upload "$GITHUB_REF_NAME" crawl4ai-proxy-*.tar.gz --clobber
