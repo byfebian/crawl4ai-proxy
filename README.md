@@ -38,7 +38,7 @@ See [`API Reference`](https://github.com/byfebian/crawl4ai-proxy/wiki/API-Refere
 ```yaml
 services:
     crawl4ai-proxy:
-        image: ghcr.io/byfebian/crawl4ai-proxy:0.0.4
+        image: ghcr.io/byfebian/crawl4ai-proxy:0.0.6
         environment:
             - LISTEN_PORT=8000
             - CRAWL4AI_ENDPOINT=http://crawl4ai:11235/crawl
@@ -73,6 +73,8 @@ networks:
 ```bash
 docker compose up -d
 ```
+
+> **Note on the image:** since v0.0.6 the proxy image is published as a single-arch `linux/amd64` image. Every GitHub Release also carries the image as a `.tar.gz` asset as a backup copy - if a pull ever fails, download it from the release page and run `docker load -i crawl4ai-proxy-<version>.tar.gz`, then tag it back with `docker tag`.
 
 > **Note:** Crawl4AI takes 2-3 minutes on first start to download Playwright browser binaries.
 

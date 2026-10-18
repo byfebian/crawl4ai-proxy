@@ -1,0 +1,66 @@
+name: Weekly GHCR pull check
+
+# v0.0.6: the v0.0.3-v0.0.5 images sat broken on GHCR for months and the
+# first signal was a user email. This check pulls the published tags
+# every week and opens an issue within days if a pull ever fails again.
+# It only reads from GHCR and never deletes anything.
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  pull-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull published tags
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          image="ghcr.io/${{ github.repository }}"
+          tags="latest"
+          latest_release="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName 2>/dev/null || true)"
+          if [ -n "$latest_release" ]; then
+            tags="$tags ${latest_release#v} $latest_release"
+          fi
+          failed=""
+          for tag in $tags; do
+            echo "== docker pull $image:$tag"
+            if docker pull "$image:$tag"; then
+              echo "OK: $tag"
+            else
+              echo "::error::PULL FAILED: $image:$tag"
+              failed="$failed $tag"
+            fi
+          done
+          echo "failed_tags=$failed" >> "$GITHUB_OUTPUT"
+          if [ -n "$failed" ]; then
+            echo "### GHCR pull check FAILED for:$failed" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### GHCR pull check passed for: $tags" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Open issue on failure
+        if: steps.check.outputs.failed_tags != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="GHCR pull check failed: crawl4ai-proxy image cannot be pulled"
+          open_count="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number --jq 'length')"
+          if [ "$open_count" != "0" ]; then
+            echo "An open pull-check issue already exists, not creating a duplicate."
+            exit 0
+          fi
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "$title" \
+            --body "The weekly pull check could not pull these published tags: \`${{ steps.check.outputs.failed_tags }}\`
+
+          Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+
+          This is the failure mode that broke v0.0.3-v0.0.5 (tags present on GHCR, image content missing). Republish the affected version from its GitHub Release tarball asset or cut a new patch release."

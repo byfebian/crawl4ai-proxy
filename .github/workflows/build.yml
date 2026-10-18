@@ -13,18 +13,23 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # v0.0.3 change:
-      # Enable emulation + buildx so one workflow can publish amd64 + arm64 images.
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
+      # v0.0.6 change (forever-fix for the broken v0.0.3-v0.0.5 images):
+      # Publish SINGLE-ARCH linux/amd64 only. A multi-arch image is an
+      # index pointing at per-platform child manifests, which GHCR stores
+      # as untagged package versions. When those untagged versions were
+      # deleted, every tagged multi-arch image became unpullable while its
+      # tag still looked fine (GHCR index survived, children returned 404).
+      # A single-arch image has no child manifests, so that failure mode
+      # cannot happen. QEMU/emulation is no longer needed (amd64 runner
+      # builds amd64 natively). NEVER add a delete-untagged-versions /
+      # package-cleanup step to this repository.
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -50,8 +55,54 @@ jobs:
         with:
           context: .
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
+          # No attestation child manifests either (provenance/sbom off).
+          provenance: false
+          sbom: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # v0.0.6: a green build must mean "users can actually pull this".
+      # Pull every published tag back from GHCR and assert each one is a
+      # single manifest, not an index/manifest list.
+      - name: Verify published tags are pullable
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${{ steps.meta.outputs.tags }}" > /tmp/published-tags.txt
+          while IFS= read -r image; do
+            [ -n "$image" ] || continue
+            echo "== Pulling $image"
+            docker pull "$image"
+            media_type="$(docker buildx imagetools inspect --raw "$image" | jq -r .mediaType)"
+            echo "mediaType: $media_type"
+            case "$media_type" in
+              *manifest.list*|*image.index*)
+                echo "::error::$image is an index/manifest list, expected a single manifest"
+                exit 1
+                ;;
+            esac
+          done < /tmp/published-tags.txt
+
+      # v0.0.6: keep an offline copy of every release image as a GitHub
+      # Release asset, so GHCR is never the only home of a published
+      # version. Users can restore with: docker load -i <file>.tar.gz
+      - name: Export image tarball
+        if: github.ref_type == 'tag'
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          docker save "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${version}" | gzip > "crawl4ai-proxy-${version}.tar.gz"
+          ls -lh crawl4ai-proxy-*.tar.gz
+
+      - name: Attach image tarball to GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          fi
+          gh release upload "$GITHUB_REF_NAME" crawl4ai-proxy-*.tar.gz --clobber
