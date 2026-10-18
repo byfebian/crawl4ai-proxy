@@ -10,10 +10,13 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  # Job 1: build + push + verify. This job checks out and builds repo
+  # code, so its token stays at contents: read (the pre-v0.0.6 setting).
+  # packages: write is only for pushing the image to GHCR.
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       packages: write
 
     steps:
@@ -85,19 +88,30 @@ jobs:
             esac
           done < /tmp/published-tags.txt
 
-      # v0.0.6: keep an offline copy of every release image as a GitHub
-      # Release asset, so GHCR is never the only home of a published
-      # version. Users can restore with: docker load -i <file>.tar.gz
+  # Job 2: release tarball. Creating a GitHub Release + uploading an
+  # asset requires contents: write, so that permission lives HERE only:
+  # this job has no checkout step and runs no repo code at all - it just
+  # pulls the already-pushed public image and uploads a tarball of it.
+  # (Security split added right after v0.0.6 at the owner's request: the
+  # write token never coexists with code execution.)
+  release-tarball:
+    needs: build-and-push
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
       - name: Export image tarball
-        if: github.ref_type == 'tag'
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
-          docker save "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${version}" | gzip > "crawl4ai-proxy-${version}.tar.gz"
+          image="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${version}"
+          docker pull "$image"
+          docker save "$image" | gzip > "crawl4ai-proxy-${version}.tar.gz"
           ls -lh crawl4ai-proxy-*.tar.gz
 
       - name: Attach image tarball to GitHub Release
-        if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
